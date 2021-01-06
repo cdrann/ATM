@@ -1,6 +1,8 @@
 ﻿using ATMProject;
 using System;
 using System.Windows.Forms;
+using System.Collections.Generic;
+using ATM;
 
 namespace ATMproject
 {
@@ -8,6 +10,7 @@ namespace ATMproject
     {
         private Account currAccount = new Account(); 
         private ATM currATM = new ATM();
+        private Transaction currTransaction = null;
 
         public Form1()
         {
@@ -137,7 +140,11 @@ namespace ATMproject
                 if(Validator.IsValidWithdrawal(checkBoxL, checkBoxS, txtTerminal, 
                     currAccount.GetAmount(), currATM.GetCurrNotesSum()))
                 {
-                    currATM.ExecuteModeWithdrawal(txtTerminal, checkBoxS, checkBoxL, currAccount);
+                    /*currATM.Withdraw(int.Parse(txtTerminal.Text), checkBoxS.Checked, 
+                        checkBoxL.Checked, currAccount);*/
+                    currTransaction = new Withdrawal(currATM, currAccount, int.Parse(txtTerminal.Text), checkBoxS.Checked,
+                        checkBoxL.Checked);
+                    currTransaction.Execute();
                 }
 
                 groupBoxModeWithdrawal.Visible = false;
@@ -149,7 +156,13 @@ namespace ATMproject
             }
             else if (currATM.GetMode() == "deposit")
             {
-                currATM.ExecuteModeDeposit(groupBoxModeDeposit, currAccount);
+                Dictionary<int, int> billsToDeposit = ATM.getInfoAboutBillsToDeposit(groupBoxModeDeposit);
+
+                //if (Validator.IsValidDeposit(groupBoxModeDeposit)) { }
+                //currATM.ExecuteModeDeposit(billsToDeposit, currAccount);
+
+                currTransaction = new Deposit(currATM, currAccount, billsToDeposit);
+                currTransaction.Execute();
                 
                 groupBoxModeDeposit.Visible = false;
                 txtboxDialogBox.Clear();
@@ -165,7 +178,8 @@ namespace ATMproject
 
             txtTerminal.Text = "";
             txtboxDialogBox.Clear();
-            txtboxDialogBox.AppendText("Ваш текущий баланс составляет " + currAccount.GetAmount() + " рублей.");
+            txtboxDialogBox.AppendText("Текущий баланс на карте составляет " 
+                + currAccount.GetAmount() + " рублей.");
         }
 
         private void btnDeposit_Click(object sender, EventArgs e)
@@ -197,7 +211,7 @@ namespace ATMproject
 
         private void btnState_Click(object sender, EventArgs e) 
         {
-            MessageBox.Show(currATM.GetState(), "Банкомат сейчас содержит:");
+            MessageBox.Show(currATM.GetStateReadable(), "Банкомат сейчас содержит:");
         }
     }
 }

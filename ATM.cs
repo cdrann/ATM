@@ -4,35 +4,78 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 
-
 namespace ATMproject
 {
     public class ATM
     {
-        public Dictionary<int, int> Cash = new Dictionary<int, int> //DO PRIVATE + getter setter
+        public CurrencyBill bills50s;
+        public CurrencyBill bills100s;
+        public CurrencyBill bills200s;
+        public CurrencyBill bills500s;
+        public CurrencyBill bills1000s;
+        public CurrencyBill bills2000s;
+        public CurrencyBill bills5000s;
+
+        private string mode;
+
+        private int maxNotesAmount;
+
+        private int currNotesAmount;
+
+
+        public ATM()
         {
-            [50] = 0,
-            [100] = 0,
-            [200] = 0,
-            [500] = 0,
-            [1000] = 0,
-            [2000] = 0,
-            [5000] = 0
-        };
+            //creating handlers, setting initial state of ATM
+            bills50s = new CurrencyBill(50, 1);
+            bills100s = new CurrencyBill(100, 2);
+            bills200s = new CurrencyBill(200, 3);
+            bills500s = new CurrencyBill(500, 2);
+            bills1000s = new CurrencyBill(1000, 4);
+            bills2000s = new CurrencyBill(2000, 1);
+            bills5000s = new CurrencyBill(5000, 1);
 
-        private string mode = "authorization";
+            bills50s
+                .RegisterNext(bills100s)
+                  .RegisterNext(bills200s)
+                  .RegisterNext(bills500s)
+                  .RegisterNext(bills1000s)
+                  .RegisterNext(bills2000s)
+                  .RegisterNext(bills5000s);
 
-        private int maxNotesAmount = 10;
+             mode = "authorization";
 
-        private int currNotesAmount = 0;
+             maxNotesAmount = 15;
 
-        private int currNotesSum = 0;
+             currNotesAmount = 0;
+        }
+
+
+
+
+        public Dictionary<int, int> getCurrCashInATM()
+        {
+            return new Dictionary<int, int>
+            {
+                [50] = bills50s.GetQuantity(),
+                [100] = bills100s.GetQuantity(),
+                [200] = bills200s.GetQuantity(),
+                [500] = bills500s.GetQuantity(),
+                [1000] = bills1000s.GetQuantity(),
+                [2000] = bills2000s.GetQuantity(),
+                [5000] = bills5000s.GetQuantity()
+            };
+        }
+
+        
+
+
 
         public string GetMode()
         {
             return mode;
         }
 
+        //TODO : то что тут PUBLIC -- плохо?
         public void SetMode(string newMode)
         {
             mode = newMode;
@@ -48,25 +91,37 @@ namespace ATMproject
             return currNotesAmount;
         }
 
-        public void AddCurrNotesAmount(int val)
+
+        //TODO : то что тут PUBLIC -- плохо?
+        public void SetCurrNotesAmount(int amount)
         {
-            currNotesAmount += val;
+            currNotesAmount += amount;
         }
 
         public int GetCurrNotesSum()
         {
-            return currNotesSum;
+            Dictionary<int, int> currState = getCurrCashInATM();
+            int sum = 0;
+
+            foreach (KeyValuePair<int, int> keyValue in currState)
+            {
+                sum += keyValue.Key * keyValue.Value;
+            }
+
+            return sum;
         }
 
-        public void AddCurrNotesSum(int val)
-        {
-            currNotesSum += val;
-        }
 
-        public string GetState()
+
+
+
+        public string GetStateReadable()
         {
             string state = "";
-            foreach (KeyValuePair<int, int> kvp in Cash)
+
+            var currCashState = getCurrCashInATM();
+
+            foreach (KeyValuePair<int, int> kvp in currCashState)
             {
                 state += string.Format("{0}: {1} купюр\n",
                     kvp.Key, kvp.Value);
@@ -75,18 +130,39 @@ namespace ATMproject
             return state;
         }
 
-        public void ExecuteModeDeposit_Iteration(GroupBox box, Account currAccount)
+
+
+
+
+        // another class??
+        public static Dictionary<int, int> getInfoAboutBillsToDeposit(GroupBox groupBoxModeDeposit)
+        {
+            Dictionary<int, int> BillsToDeposit = new Dictionary<int, int>(); ;
+
+            foreach (GroupBox box in groupBoxModeDeposit.Controls.OfType<GroupBox>())
+            {
+                KeyValuePair<int, int> denomination_quantity_pair = ExecuteGetNumBills_Iteration(box); 
+                
+                BillsToDeposit.Add(denomination_quantity_pair.Key, denomination_quantity_pair.Value);
+            }
+
+            return BillsToDeposit;
+        }
+
+        public static KeyValuePair<int, int> ExecuteGetNumBills_Iteration(GroupBox box)
         {
             bool state = false;
-            int name = 0;
-            string curramount = "";
-
+            int denomination = 0; //denomination
+            
+            string curramount = ""; //quantity
+            int quantity;
+       
             for (int i = 0; i < box.Controls.Count; i++)
             {
                 if (box.Controls[i] is CheckBox)
                 {
                     state = ((CheckBox)box.Controls[i]).Checked;
-                    name = int.Parse(((CheckBox)box.Controls[i]).Text);
+                    denomination = int.Parse(((CheckBox)box.Controls[i]).Text);
                 }
                 if (box.Controls[i] is TextBox)
                 {
@@ -94,201 +170,129 @@ namespace ATMproject
                 }
             }
 
-            if (state == false && !string.IsNullOrEmpty(curramount))
-            {
-                MessageBox.Show("Введено количество купюр, но не отмечена необходимость внесения, " +
-                    "повторите операцию");
-            }
-            else if (state)
-            {
-                Validator.CheckingNotes(curramount, name, this, currAccount);
-            }
+            KeyValuePair<string, bool> boxVals = new KeyValuePair<string, bool> (curramount, state);
+            Validator.ValidateCurrBox(boxVals);
 
+            quantity = int.Parse(curramount);
+            KeyValuePair<int, int> denomination_quantity_pair = new KeyValuePair<int, int>(denomination, quantity);
+
+            //TODO ref????????????????????????????????///
             for (int i = 0; i < box.Controls.Count; i++)
             {
-                if (box.Controls[i] is CheckBox)
-                {
-                    ((CheckBox)box.Controls[i]).Checked = false;
-                }
-                if (box.Controls[i] is TextBox)
-                {
-                    ((TextBox)box.Controls[i]).Text = string.Empty;
-                }
-            }
+                 if (box.Controls[i] is CheckBox)
+                 {
+                     ((CheckBox)box.Controls[i]).Checked = false;
+                 }
+                 if (box.Controls[i] is TextBox)
+                 {
+                     ((TextBox)box.Controls[i]).Text = string.Empty;
+                 }
+            } 
+            
+
+            return denomination_quantity_pair;
         }
 
-        public void ExecuteModeDeposit(GroupBox groupBoxModeDeposit, Account currAccount)
+
+
+
+
+
+
+
+
+
+
+
+
+        public int ExecuteWithdraw(bool isSmallMode, bool isLargeMode, int amount)
         {
-            foreach (GroupBox box in groupBoxModeDeposit.Controls.OfType<GroupBox>())
+            var currCashState = getCurrCashInATM();
+            Dictionary<int, int> source = new Dictionary<int, int>(currCashState);
+
+            CurrencyBill firstHandler = null;
+
+            if (isSmallMode)
             {
-                ExecuteModeDeposit_Iteration(box, currAccount);
+                //set proper handlers pipeline
+                bills50s
+                    .RegisterNext(bills100s)
+                    .RegisterNext(bills200s)
+                    .RegisterNext(bills500s)
+                    .RegisterNext(bills1000s)
+                    .RegisterNext(bills2000s)
+                    .RegisterNext(bills5000s);
+
+                firstHandler = bills50s;
             }
+            else if (isLargeMode)
+            {
+                //set proper handlers pipeline
+                bills5000s
+                    .RegisterNext(bills2000s)
+                    .RegisterNext(bills1000s)
+                    .RegisterNext(bills500s)
+                    .RegisterNext(bills200s)
+                    .RegisterNext(bills100s)
+                    .RegisterNext(bills50s);
+
+                firstHandler = bills5000s;
+            }
+
+            int sum_dispense = 0;
+            doWithdraw(amount, firstHandler, ref sum_dispense);
+
+            return sum_dispense; 
         }
 
-        public void ExecuteModeWithdrawal(TextBox txtTerminal, CheckBox checkBoxS, CheckBox checkBoxL, Account currAccount)
+        public void doWithdraw(int amount, CurrencyBill firstHandler, ref int sum_dispense)
         {
-            bool isImpossible = false;
-            int withdrawal = int.Parse(txtTerminal.Text); 
-
-            Dictionary<int, int> result = Withdraw(withdrawal, ref isImpossible,
-                checkBoxS, checkBoxL, txtTerminal);
-
-            if (!isImpossible)
+            while (true)
             {
-                int withdrawnNotes = 0;
-                var oldState = new Dictionary<int, int>(Cash);
-                foreach (var pair in oldState)
+                //sender pass the request to first handler in the pipeline
+                
+                var isDepensible = firstHandler.DispenseRequest(amount, this, ref sum_dispense);
+                if (!isDepensible)
                 {
-                    if (result.ContainsKey(pair.Key))
-                    {
-                        Cash[pair.Key] = oldState[pair.Key] - result[pair.Key];
-                        withdrawnNotes += result[pair.Key];
-                    }
+                    MessageBox.Show($"Failed to dispense ${amount}!");
                 }
-
-                MessageBox.Show(withdrawal + " успешно выдано.");
-
-                currAccount.AddAmount(-withdrawal);
-                AddCurrNotesSum(-withdrawal);
-                AddCurrNotesAmount(-withdrawnNotes);
             }
         }
 
 
-        public Dictionary<int, int> Withdraw(int amount, ref bool fl, 
-            CheckBox checkBoxS, CheckBox checkBoxL, TextBox txtTerminal)
+
+
+
+
+        public int ExecuteDeposit(Dictionary<int, int> billsToDeposit, Account currAccount)
         {
-            Dictionary<int, int> r = new Dictionary<int, int>();
-            Dictionary<int, int> source = new Dictionary<int, int>(Cash);
-
-            if (!checkBoxL.Checked && txtTerminal != null)
+            int sum_deposit = 0;
+            foreach (KeyValuePair<int, int> keyValue in billsToDeposit)
             {
-                WithdrawSmall(amount, source, r, ref fl);
-            }
-            else if (!checkBoxS.Checked && txtTerminal != null)
-            {
-                WithdrawLarge(amount, source, r, ref fl);
+                doDeposit(keyValue.Value, keyValue.Key, currAccount, ref sum_deposit);
             }
 
-            r = r.Where(kvp => kvp.Value != 0).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-
-            return r;
+            return sum_deposit; //sum that was deposited
         }
 
-
-        public void WithdrawLarge(int sumNeeded, Dictionary<int, int> source, Dictionary<int, int> result, ref bool fl)
+        public void doDeposit(int amount, int denomination, Account currAccount, ref int sum_deposit)
         {
-            try
+            while (true)
             {
-                int change;
-                int k = 0;
-
-                if (source.Count > result.Count)
+                //sender pass the request to first handler in the pipeline
+                var isDeposible = bills50s.DepositRequest(amount, denomination, currAccount, this, ref sum_deposit);
+                if (!isDeposible)
                 {
-                    k = source.Where(kvp => !result.ContainsKey(kvp.Key)).ToDictionary(kvp => kvp.Key,
-                        kvp => kvp.Value).Keys.Max();
+                    MessageBox.Show($"Failed to deposit ${amount}!");
+                    //привышено количество максимальное купюр в банкомате
                 }
-                else
-                {
-                    fl = true;
-                    throw new Exception("Требуемую сумму невозможно выдать");
-                }
-
-                KeyValuePair<int, int> sel = new KeyValuePair<int, int>(k, sumNeeded / k);
-                if (sel.Value > source[sel.Key])
-                {
-                    change = sumNeeded - sel.Key * source[sel.Key];
-                    sel = new KeyValuePair<int, int>(sel.Key, source[sel.Key]);
-                }
-                else
-                {
-                    change = sumNeeded - sel.Key * sel.Value;
-                }
-
-                if (change == 0)
-                {
-                    result.Add(sel.Key, sel.Value);
-                    return;
-                }
-
-                if (change < source.Keys.Min())
-                {
-                    sel = new KeyValuePair<int, int>(sel.Key, sel.Value - 1);
-                    result.Add(sel.Key, sel.Value);
-                    WithdrawLarge(sumNeeded - sel.Key * sel.Value, source, result, ref fl);
-                    return;
-                }
-
-                source[sel.Key] -= sel.Value;
-                result.Add(sel.Key, sel.Value);
-
-                WithdrawLarge(change, source, result, ref fl);
-            }
-            catch (Exception ex)
-            {
-                if (ex.Source != null)
-                    MessageBox.Show("Ошибка при попытке выдать крупными купюрами, попробуйте другой способ "
-                        + ex.Source);
-                return;
             }
         }
 
-
-        public void WithdrawSmall(int sumNeeded, Dictionary<int, int> source, Dictionary<int, int> result, ref bool fl)
-        {
-            try
-            {
-                int change;
-                int k = 0;
-
-                if (source.Count > result.Count)
-                {
-                    k = source.Where(kvp => !result.ContainsKey(kvp.Key)).ToDictionary(kvp => kvp.Key,
-                        kvp => kvp.Value).Keys.Min();
-                }
-                else
-                {
-                    fl = true;
-                    throw new Exception("Требуемую сумму невозможно выдать");
-                }
-
-                KeyValuePair<int, int> sel = new KeyValuePair<int, int>(k, sumNeeded / k);
-                if (sel.Value > source[sel.Key])
-                {
-                    change = sumNeeded - sel.Key * source[sel.Key];
-                    sel = new KeyValuePair<int, int>(sel.Key, source[sel.Key]);
-                }
-                else
-                {
-                    change = sumNeeded - sel.Key * sel.Value;
-                }
-
-                if (change == 0)
-                {
-                    result.Add(sel.Key, sel.Value);
-                    return;
-                }
-
-                if (change > source.Keys.Max())
-                {
-                    sel = new KeyValuePair<int, int>(sel.Key, sel.Value + 1);
-                    result.Add(sel.Key, sel.Value);
-                    WithdrawSmall(sumNeeded - sel.Key * sel.Value, source, result, ref fl);
-                    return;
-                }
-
-                source[sel.Key] -= sel.Value;
-                result.Add(sel.Key, sel.Value);
-
-                WithdrawSmall(change, source, result, ref fl);
-            }
-            catch (Exception ex)
-            {
-                if (ex.Source != null)
-                    MessageBox.Show("Ошибка при попытке выдать мелкими купюрами, попробуйте другой способ "
-                        + ex.Source);
-                return;
-            }
-        }
     }
+
+
+
+
+
 }
