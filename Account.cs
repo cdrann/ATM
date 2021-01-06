@@ -20,6 +20,8 @@
             return amount;
         }
 
+
+        // PUBLIC??????????? do private or delete??? create setter???? 
         public void AddAmount(int amountAdded)
         {
             amount += amountAdded;
